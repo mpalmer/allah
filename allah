@@ -1,0 +1,274 @@
+#!/usr/bin/env ruby
+
+# A god-compatible CLI to daemontools services.
+
+if File.basename($0) == "god"
+	GOD = true
+else
+	GOD = false
+end
+
+def main
+	exit case ARGV[0]
+		when nil:         do_help
+		when 'help':      do_help
+		when '--help':    do_help
+		when 'start':     do_action(ARGV[1], :start)
+		when 'restart':   do_action(ARGV[1], :restart)
+		when 'stop':      do_action(ARGV[1], :stop)
+		when 'remove':    do_action(ARGV[1], :remove)
+		when 'monitor':   do_action(ARGV[1], :monitor)
+		when 'unmonitor': do_action(ARGV[1], :unmonitor)
+		when 'log':       do_log(ARGV[1])
+		when 'status':    do_status(ARGV[1])
+		when 'signal':    do_signal(ARGV[1], ARGV[2])
+		else
+			puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
+			1
+	end
+end
+
+def do_help
+	puts <<EOF
+  Usage:
+    allah <command> [arguments]
+
+    Commands:
+      start <task or group name>         start task or group
+      restart <task or group name>       restart task or group
+      stop <task or group name>          stop task or group
+      monitor <task or group name>       monitor task or group
+      unmonitor <task or group name>     unmonitor task or group
+      remove <task or group name>        remove task or group from god
+      log <task or group name>           show realtime log for given task
+      status [task or group name]        show status
+      signal <task or group name> <sig>  signal all matching tasks
+EOF
+	return 0
+end
+
+def do_action(svc_or_group, action)
+	svclist = scan_services
+	
+	ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
+	if ctl.nil?
+		puts "Task or Group '#{svc_or_group}' not found"
+		return 1
+	end
+	
+	ctl.send(action) ? 0 : 1
+end
+
+def do_log(svc)
+	if svc.nil?
+		puts "You must specify a Task name"
+		return 1
+	end
+	
+	svclist = scan_services
+	logfiles = []
+	
+	if svclist[:services][svc]
+		logfiles = [svclist[:services][svc].logfile]
+		if logfiles[0].nil?
+			puts "Cannot find logfile for service #{svc}"
+			return 1
+		end
+	elsif svclist[:groups][svc]
+		logfiles = svclist[:groups][svc].services.map do |s|
+			if s.logfile.nil?
+				puts "Cannot find logfile for service #{s.name} (part of group #{svc})"
+				return 1
+			end
+			s.logfile
+		end
+	else
+		puts "Task '#{svc}' not found"
+		return 1
+	end
+
+	exec "tail -f #{logfiles.join(' ')} | tai64nlocal"
+
+	# This function, if successfully executed, never returns
+	raise RuntimeError.new "Can't happen: dropped out the bottom of do_log"
+end
+
+def do_status(svc_or_group_or_nil)
+	svclist = scan_services
+
+	sgn = svclist[:groups][svc_or_group_or_nil] ||
+	      svclist[:services][svc_or_group_or_nil] ||
+	      nil
+	
+	if sgn.nil?
+		svclist[:groups].values.each do |g|
+			puts "#{g.name}:"
+			g.services.each do |s|
+				puts "  #{s.name}: #{s.status}"
+			end
+		end
+	elsif sgn.is_a? Allah::Group
+		puts "#{sgn.name}:"
+		sgn.services.each do |s|
+			puts "  #{s.name}: #{s.status}"
+		end
+	else
+		puts "#{sgn.name}: #{sgn.status}"
+	end
+	
+	0
+end
+
+def do_signal(svc_or_group, sig)
+	svclist = scan_services
+
+	sgn = svclist[:groups][svc_or_group_or_nil] ||
+	      svclist[:services][svc_or_gorup_or_nil] ||
+	      nil
+
+	puts "Sending signal '#{sig}' to '#{svc_or_group}'"
+	puts
+	
+	if sgn.nil?
+		puts "No matching task or group"
+	else
+		sgn.signal(sig) ? 0 : 1
+	end
+end
+
+# Find the service dir by the sneaky means of looking for an svscan and
+# digging out it's cwd.  Raise RuntimeError if not found.
+def svdir
+	Dir["/proc/*"].each do |p|
+		File.exists?(File.join(p, 'exe')) or next
+		File.readlink(File.join(p, 'exe')).split("\000")[0] =~ %r{/svscan$} or next
+		return File.readlink(File.join(p, 'cwd'))
+	end
+	
+	raise RuntimeError.new "Failed to find service dir.  Is svscan running?"
+end
+		
+# Scan the system's service dir and return a hash with two keys:
+#
+#  - :services -- a hash of svcname => Allah::Service instances,
+#     representing the services configured; and
+#  - :groups -- a hash of groupname => Allah::Group instances, representing
+#     the groups that have been configured.
+def scan_services
+	rv = { :services => {}, :groups => {} }
+	
+	Dir[File.join(svdir, '*')].each do |s|
+		File.exists?(File.join(s, 'supervise')) or next
+		svc = Allah::Service.new(s)
+		rv[:services][svc.name] = svc
+		(rv[:groups][svc.group || 'none'] ||= Allah::Group.new(svc.group || 'none')) << svc
+	end
+	
+	return rv
+end
+
+module Allah
+	class Service
+		def initialize(svcdir)
+			@svcdir = svcdir
+		end
+
+		def name
+			File.basename(@svcdir)
+		end
+		
+		# Read the service's group file and return the name of
+		# the group, or nil if the file doesn't exist
+		def group
+			File.read(File.join(@svcdir, 'group')).first.strip
+		rescue
+			nil
+		end
+		
+		def start
+			signal("UP")
+		end
+		
+		def stop
+			if GOD
+				6.times { signal("DOWN"); return 0 if status == 'down'; sleep 1 }
+				signal("KILL")
+			else
+				signal("DOWN")
+			end
+		end
+		
+		def restart
+			if GOD
+				stop
+				start
+			else
+				signal("TERM")
+			end
+		end
+		
+		def remove
+			File.unlink(@svcdir)
+		end
+		
+		def monitor
+			signal("UP")
+		end
+		
+		def unmonitor
+			signal("ONCE")
+		end
+		
+		# Send the specified signal to the service.  Returns true
+		# if the signal was delivered, or false otherwise
+		def signal(sig)
+			opt = case sig
+				when "UP":         '-u'
+				when "DOWN":       '-d'
+				when "ONCE":       '-o'
+				when "STOP":       '-p'
+				when "CONT":       '-c'
+				when "HUP",   "1": '-h'
+				when "ALRM", "14": '-a'
+				when "INT",   "2": '-i'
+				when "TERM", "15": '-t'
+				when "KILL",  "9": '-k'
+				else
+					puts "Unknown signal: #{sig}"
+					return false
+			end
+			
+			system("svc #{opt} #{@svcdir}")
+			true
+		end
+		
+		# Are you up, or down, or confused?
+		def status
+			`svstat #{@svcdir}`.split(':')[1].strip.split(' ')[0]
+		end
+		
+		def logfile
+			Dir["#{@svcdir}/log/*/current"].first
+		end
+	end
+	
+	class Group
+		attr_reader :name, :services
+		
+		def initialize(name)
+			@name = name || 'nil'
+			@services = []
+		end
+		
+		def <<(svc)
+			@services << svc
+		end
+		
+		def method_missing(method, *args)
+			super unless [:start, :stop, :restart, :remove, :monitor, :unmonitor].include?(method)
+			@services.each { |s| s.send(method) }
+		end
+	end
+end
+
+main if $0 == __FILE__
