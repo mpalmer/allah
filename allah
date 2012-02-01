@@ -131,6 +131,7 @@ def do_signal(svc_or_group, sig)
 
 	if sgn.nil?
 		puts "No matching task or group"
+		GOD ? 0 : 1
 	else
 		sgn.signal(sig) ? 0 : 1
 	end
