@@ -96,27 +96,45 @@ end
 def do_status(svc_or_group_or_nil)
 	svclist = scan_services
 
-	sgn = svclist[:groups][svc_or_group_or_nil] ||
-	      svclist[:services][svc_or_group_or_nil] ||
-	      nil
-
-	if sgn.nil?
-		svclist[:groups].values.each do |g|
-			puts "#{g.name}:"
-			g.services.each do |s|
-				puts "  #{s.name}: #{s.status}"
-			end
-		end
-	elsif sgn.is_a? Allah::Group
-		puts "#{sgn.name}:"
-		sgn.services.each do |s|
-			puts "  #{s.name}: #{s.status}"
-		end
-	else
-		puts "#{sgn.name}: #{sgn.status}"
+	sgn = :all
+	unless svc_or_group_or_nil.nil?
+		sgn = svclist[:groups][svc_or_group_or_nil] ||
+		      svclist[:services][svc_or_group_or_nil] ||
+		      nil
 	end
 
-	0
+	if sgn.nil?
+		puts "Task or Group '#{svc_or_group_or_nil}' not found."
+		return 1
+	elsif sgn == :all
+		down = 0
+		svclist[:groups].values.each do |g|
+			puts "#{g.name}:"
+			down += g.services.count do |s|
+				st = s.status
+				puts "  #{s.name}: #{st}"
+				st != "up"
+			end
+		end
+		return 0 if GOD
+		return 0 if down == 0
+		return 1
+	elsif sgn.is_a? Allah::Group
+		puts "#{sgn.name}:"
+		down = sgn.services.count do |s|
+			st = s.status
+			puts "  #{s.name}: #{st}"
+			st != "up"
+		end
+		return down if GOD
+		return 0    if down == 0
+		return 1
+	else
+		st = sgn.status
+		puts "#{sgn.name}: #{st}"
+		return 0 if st == "up"
+		return 1
+	end
 end
 
 def do_signal(svc_or_group, sig)
