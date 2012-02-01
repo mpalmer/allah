@@ -245,7 +245,12 @@ module Allah
 
 		# Are you up, or down, or confused?
 		def status
-			`svstat #{@svcdir}`.split(':')[1].strip.split(' ')[0]
+			case st = `svstat #{@svcdir}`.split(':')[1].strip.split(' ')[0]
+				when "down"
+					GOD ? "unmonitored" : st
+				else
+					st
+			end
 		end
 
 		def logfile
