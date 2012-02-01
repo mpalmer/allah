@@ -49,13 +49,13 @@ end
 
 def do_action(svc_or_group, action)
 	svclist = scan_services
-	
+
 	ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
 	if ctl.nil?
 		puts "Task or Group '#{svc_or_group}' not found"
 		return 1
 	end
-	
+
 	ctl.send(action) ? 0 : 1
 end
 
@@ -64,10 +64,10 @@ def do_log(svc)
 		puts "You must specify a Task name"
 		return 1
 	end
-	
+
 	svclist = scan_services
 	logfiles = []
-	
+
 	if svclist[:services][svc]
 		logfiles = [svclist[:services][svc].logfile]
 		if logfiles[0].nil?
@@ -99,7 +99,7 @@ def do_status(svc_or_group_or_nil)
 	sgn = svclist[:groups][svc_or_group_or_nil] ||
 	      svclist[:services][svc_or_group_or_nil] ||
 	      nil
-	
+
 	if sgn.nil?
 		svclist[:groups].values.each do |g|
 			puts "#{g.name}:"
@@ -115,7 +115,7 @@ def do_status(svc_or_group_or_nil)
 	else
 		puts "#{sgn.name}: #{sgn.status}"
 	end
-	
+
 	0
 end
 
@@ -128,7 +128,7 @@ def do_signal(svc_or_group, sig)
 
 	puts "Sending signal '#{sig}' to '#{svc_or_group}'"
 	puts
-	
+
 	if sgn.nil?
 		puts "No matching task or group"
 	else
@@ -144,10 +144,10 @@ def svdir
 		File.readlink(File.join(p, 'exe')).split("\000")[0] =~ %r{/svscan$} or next
 		return File.readlink(File.join(p, 'cwd'))
 	end
-	
+
 	raise RuntimeError.new "Failed to find service dir.  Is svscan running?"
 end
-		
+
 # Scan the system's service dir and return a hash with two keys:
 #
 #  - :services -- a hash of svcname => Allah::Service instances,
@@ -156,14 +156,14 @@ end
 #     the groups that have been configured.
 def scan_services
 	rv = { :services => {}, :groups => {} }
-	
+
 	Dir[File.join(svdir, '*')].each do |s|
 		File.exists?(File.join(s, 'supervise')) or next
 		svc = Allah::Service.new(s)
 		rv[:services][svc.name] = svc
 		(rv[:groups][svc.group || 'none'] ||= Allah::Group.new(svc.group || 'none')) << svc
 	end
-	
+
 	return rv
 end
 
@@ -176,7 +176,7 @@ module Allah
 		def name
 			File.basename(@svcdir)
 		end
-		
+
 		# Read the service's group file and return the name of
 		# the group, or nil if the file doesn't exist
 		def group
@@ -184,11 +184,11 @@ module Allah
 		rescue
 			nil
 		end
-		
+
 		def start
 			signal("UP")
 		end
-		
+
 		def stop
 			if GOD
 				6.times { signal("DOWN"); return 0 if status == 'down'; sleep 1 }
@@ -197,7 +197,7 @@ module Allah
 				signal("DOWN")
 			end
 		end
-		
+
 		def restart
 			if GOD
 				stop
@@ -206,19 +206,19 @@ module Allah
 				signal("TERM")
 			end
 		end
-		
+
 		def remove
 			File.unlink(@svcdir)
 		end
-		
+
 		def monitor
 			signal("UP")
 		end
-		
+
 		def unmonitor
 			signal("ONCE")
 		end
-		
+
 		# Send the specified signal to the service.  Returns true
 		# if the signal was delivered, or false otherwise
 		def signal(sig)
@@ -237,33 +237,33 @@ module Allah
 					puts "Unknown signal: #{sig}"
 					return false
 			end
-			
+
 			system("svc #{opt} #{@svcdir}")
 			true
 		end
-		
+
 		# Are you up, or down, or confused?
 		def status
 			`svstat #{@svcdir}`.split(':')[1].strip.split(' ')[0]
 		end
-		
+
 		def logfile
 			Dir["#{@svcdir}/log/*/current"].first
 		end
 	end
-	
+
 	class Group
 		attr_reader :name, :services
-		
+
 		def initialize(name)
 			@name = name || 'nil'
 			@services = []
 		end
-		
+
 		def <<(svc)
 			@services << svc
 		end
-		
+
 		def method_missing(method, *args)
 			super unless [:start, :stop, :restart, :remove, :monitor, :unmonitor].include?(method)
 			@services.each { |s| s.send(method) }
