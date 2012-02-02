@@ -22,6 +22,7 @@ def main
 		when 'unmonitor': do_action(ARGV[1], :unmonitor)
 		when 'log':       do_log(ARGV[1])
 		when 'status':    do_status(ARGV[1])
+		when 'check':     GOD ? 0 : do_status(ARGV[1], true)
 		when 'signal':    do_signal(ARGV[1], ARGV[2])
 		else
 			puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
@@ -43,6 +44,13 @@ def do_help
       remove <task or group name>        remove task or group from god
       log <task or group name>           show realtime log for given task
       status [task or group name]        show status
+EOF
+	unless GOD
+		puts <<EOF
+      check [task or group name]         show status and run task checks
+EOF
+	end
+	puts <<EOF
       signal <task or group name> <sig>  signal all matching tasks
 EOF
 	return 0
@@ -94,7 +102,7 @@ def do_log(svc)
 	raise RuntimeError.new "Can't happen: dropped out the bottom of do_log"
 end
 
-def do_status(svc_or_group_or_nil)
+def do_status(svc_or_group_or_nil, check = false)
 	svclist = scan_services
 
 	sgn = :all
@@ -112,7 +120,7 @@ def do_status(svc_or_group_or_nil)
 		svclist[:groups].values.each do |g|
 			puts "#{g.name}:"
 			down += g.services.count do |s|
-				st = s.status
+				st = check ? s.check : s.status
 				puts "  #{s.name}: #{st}"
 				st != "up"
 			end
@@ -123,7 +131,7 @@ def do_status(svc_or_group_or_nil)
 	elsif sgn.is_a? Allah::Group
 		puts "#{sgn.name}:"
 		down = sgn.services.count do |s|
-			st = s.status
+			st = check ? s.check : s.status
 			puts "  #{s.name}: #{st}"
 			st != "up"
 		end
@@ -131,7 +139,7 @@ def do_status(svc_or_group_or_nil)
 		return 0    if down == 0
 		return 1
 	else
-		st = sgn.status
+		st = check ? sgn.check : sgn.status
 		puts "#{sgn.name}: #{st}"
 		return 0 if st == "up"
 		return 1
@@ -270,6 +278,20 @@ module Allah
 				else
 					st
 			end
+		end
+
+		def check
+			st = status
+			return st unless st == "up"
+
+			Dir.chdir(@svcdir) do
+				cmd = "./check"
+				if File.file?(cmd) and File.executable?(cmd)
+					st = "failed" unless system(cmd)
+				end
+			end
+
+			st
 		end
 
 		def logfile
