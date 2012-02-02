@@ -211,7 +211,7 @@ module Allah
 
 		def stop
 			if GOD
-				6.times { signal("DOWN"); return 0 if status == 'down'; sleep 1 }
+				6.times { signal("DOWN"); return 0 if status != "up"; sleep 1 }
 				signal("KILL")
 			else
 				signal("DOWN")
