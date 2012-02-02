@@ -258,8 +258,8 @@ module Allah
 					return false
 			end
 
-			system("svc #{opt} #{@svcdir}")
-			true
+			rc = system("svc #{opt} #{@svcdir}")
+			GOD ? true : rc
 		end
 
 		# Are you up, or down, or confused?
