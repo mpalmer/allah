@@ -9,6 +9,11 @@ else
 	GOD = false
 end
 
+RC_UP    = RC_OK  = 0
+RC_DOWN  = RC_ERR = 1
+RC_OTHER = 2
+RC_USAGE = 127
+
 def main
 	exit case ARGV[0]
 		when nil:         do_help
@@ -26,7 +31,7 @@ def main
 		when 'signal':    do_signal(ARGV[1], ARGV[2])
 		else
 			puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
-			1
+			GOD ? RC_ERR : RC_USAGE
 	end
 end
 
@@ -53,7 +58,7 @@ EOF
 	puts <<EOF
       signal <task or group name> <sig>  signal all matching tasks
 EOF
-	return 0
+	return RC_OK
 end
 
 def do_action(svc_or_group, action)
@@ -62,16 +67,16 @@ def do_action(svc_or_group, action)
 	ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
 	if ctl.nil?
 		puts "Task or Group '#{svc_or_group}' not found"
-		return GOD ? 1 : 127
+		return GOD ? RC_ERR : RC_USAGE
 	end
 
-	ctl.send(action) ? 0 : 1
+	ctl.send(action) ? RC_OK : RC_ERR
 end
 
 def do_log(svc)
 	if svc.nil?
 		puts "You must specify a Task name"
-		return GOD ? 1 : 127
+		return GOD ? RC_ERR : RC_USAGE
 	end
 
 	svclist = scan_services
@@ -81,19 +86,19 @@ def do_log(svc)
 		logfiles = [svclist[:services][svc].logfile]
 		if logfiles[0].nil?
 			puts "Cannot find logfile for service #{svc}"
-			return 1
+			return RC_ERR
 		end
 	elsif svclist[:groups][svc]
 		logfiles = svclist[:groups][svc].services.map do |s|
 			if s.logfile.nil?
 				puts "Cannot find logfile for service #{s.name} (part of group #{svc})"
-				return 1
+				return RC_ERR
 			end
 			s.logfile
 		end
 	else
 		puts "Task '#{svc}' not found"
-		return GOD ? 1 : 127
+		return GOD ? RC_ERR : RC_USAGE
 	end
 
 	exec "tail -f #{logfiles.join(' ')} | tai64nlocal"
@@ -114,35 +119,43 @@ def do_status(svc_or_group_or_nil, check = false)
 
 	if sgn.nil?
 		puts "Task or Group '#{svc_or_group_or_nil}' not found."
-		return GOD ? 1 : 127
+		return GOD ? RC_ERR : RC_USAGE
 	elsif sgn == :all
-		down = 0
+		sts = []
 		svclist[:groups].values.each do |g|
 			puts "#{g.name}:"
-			down += g.services.count do |s|
+			g.services.each do |s|
 				st = check ? s.check : s.status
 				puts "  #{s.name}: #{st}"
-				st != "up"
+				sts << st
 			end
 		end
-		return 0 if GOD
-		return 0 if down == 0
-		return 1
+		return RC_OK   if GOD
+		return RC_UP   if sts.all? { |st| st == :up   }
+		return RC_DOWN if sts.all? { |st| st == :down }
+		return RC_OTHER
 	elsif sgn.is_a? Allah::Group
 		puts "#{sgn.name}:"
-		down = sgn.services.count do |s|
+		sts = sgn.services.map do |s|
 			st = check ? s.check : s.status
 			puts "  #{s.name}: #{st}"
-			st != "up"
+			st
 		end
-		return down if GOD
-		return 0    if down == 0
-		return 1
+		return sts.count(:unmonitored) if GOD
+		return RC_UP    if sts.all? { |st| st == :up   }
+		return RC_DOWN  if sts.all? { |st| st == :down }
+		return RC_OTHER
 	else
 		st = check ? sgn.check : sgn.status
 		puts "#{sgn.name}: #{st}"
-		return 0 if st == "up"
-		return 1
+		if GOD
+			return RC_OK if st == :up
+			return RC_ERR
+		else
+			return RC_UP   if st == :up
+			return RC_DOWN if st == :down
+			return RC_OTHER
+		end
 	end
 end
 
@@ -158,9 +171,10 @@ def do_signal(svc_or_group, sig)
 
 	if sgn.nil?
 		puts "No matching task or group"
-		GOD ? 0 : 127
+		# Emulate weird God exit status
+		GOD ? RC_OK : RC_USAGE
 	else
-		sgn.signal(sig) ? 0 : 1
+		sgn.signal(sig) ? RC_OK : RC_ERR
 	end
 end
 
@@ -219,7 +233,7 @@ module Allah
 
 		def stop
 			if GOD
-				6.times { signal("DOWN"); return 0 if status != "up"; sleep 1 }
+				6.times { signal("DOWN"); return 0 if [:down, :unmonitored].include? status; sleep 1 }
 				signal("KILL")
 			else
 				signal("DOWN")
@@ -272,22 +286,23 @@ module Allah
 
 		# Are you up, or down, or confused?
 		def status
-			case st = `svstat #{@svcdir}`.split(':')[1].strip.split(' ')[0]
-				when "down"
-					GOD ? "unmonitored" : st
-				else
-					st
+			if `svstat #{@svcdir}` =~ /: (up|down)/
+				st = $1.to_sym
+				st = :unmonitored if GOD and st == :down
+			else
+				st = :unknown
 			end
+			st
 		end
 
 		def check
 			st = status
-			return st unless st == "up"
+			return st unless st == :up
 
 			Dir.chdir(@svcdir) do
 				cmd = "./check"
 				if File.file?(cmd) and File.executable?(cmd)
-					st = "failed" unless system(cmd)
+					st = :failed unless system(cmd)
 				end
 			end
 
