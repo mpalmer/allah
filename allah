@@ -2,7 +2,8 @@
 
 # A god-compatible CLI to daemontools services.
 
-if File.basename($0) == "god"
+BASENAME = File.basename($0)
+if BASENAME == "god"
 	GOD = true
 else
 	GOD = false
@@ -31,7 +32,7 @@ end
 def do_help
 	puts <<EOF
   Usage:
-    allah <command> [arguments]
+    #{BASENAME} <command> [arguments]
 
     Commands:
       start <task or group name>         start task or group
