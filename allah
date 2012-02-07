@@ -162,8 +162,8 @@ end
 def do_signal(svc_or_group, sig)
 	svclist = scan_services
 
-	sgn = svclist[:groups][svc_or_group_or_nil] ||
-	      svclist[:services][svc_or_group_or_nil] ||
+	sgn = svclist[:groups][svc_or_group] ||
+	      svclist[:services][svc_or_group] ||
 	      nil
 
 	puts "Sending signal '#{sig}' to '#{svc_or_group}'"
