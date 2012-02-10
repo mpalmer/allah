@@ -12,6 +12,7 @@ end
 RC_UP    = RC_OK  = 0
 RC_DOWN  = RC_ERR = 1
 RC_OTHER = 2
+RC_TEMP  = 126
 RC_USAGE = 127
 
 def main
@@ -179,7 +180,7 @@ def do_signal(svc_or_group, sig)
 end
 
 # Find the service dir by the sneaky means of looking for an svscan and
-# digging out it's cwd.  Raise RuntimeError if not found.
+# digging out it's cwd.  Exit unsuccessfully if not found.
 def svdir
 	Dir["/proc/*"].each do |p|
 		File.exists?(File.join(p, 'exe')) or next
@@ -187,7 +188,8 @@ def svdir
 		return File.readlink(File.join(p, 'cwd'))
 	end
 
-	raise RuntimeError.new "Failed to find service dir.  Is svscan running?"
+	$stderr.puts "Failed to find service dir.  Is svscan running?"
+	exit RC_TEMP
 end
 
 # Scan the system's service dir and return a hash with two keys:
