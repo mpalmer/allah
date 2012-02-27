@@ -217,12 +217,15 @@ end
 
 module Allah
 	class Service
+		attr_reader :name
+
 		def initialize(svcdir)
 			@svcdir = svcdir
+			@name = File.basename(svcdir)
 		end
 
-		def name
-			File.basename(@svcdir)
+		def <=>(other)
+			@name <=> other.name
 		end
 
 		# Read the service's group file and return the name of
@@ -326,6 +329,10 @@ module Allah
 		def initialize(name)
 			@name = name
 			@services = []
+		end
+
+		def <=>(other)
+			@name <=> other.name
 		end
 
 		def <<(svc)
