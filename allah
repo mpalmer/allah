@@ -1,5 +1,9 @@
 #!/usr/bin/env ruby
-
+#
+# THIS FILE IS AUTOMATICALLY DISTRIBUTED BY PUPPET. ANY LOCAL CHANGES WILL BE OVERWRITTEN!
+#
+# Contact Anchor support for help: support@anchor.com.au or 1300 883 979 (+612 8296 5111)
+#
 # A god-compatible CLI to daemontools services.
 
 BASENAME = File.basename($0)
