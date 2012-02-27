@@ -106,7 +106,7 @@ def do_log(svc)
 		return GOD ? RC_ERR : RC_USAGE
 	end
 
-	exec "tail -f #{logfiles.join(' ')} | tai64nlocal"
+	exec "tail --follow=name #{logfiles.join(' ')} | tai64nlocal"
 
 	# This function, if successfully executed, never returns
 	raise RuntimeError.new "Can't happen: dropped out the bottom of do_log"
