@@ -209,7 +209,7 @@ def scan_services
 		File.exists?(File.join(s, 'supervise')) or next
 		svc = Allah::Service.new(s)
 		rv[:services][svc.name] = svc
-		(rv[:groups][svc.group || 'none'] ||= Allah::Group.new(svc.group || 'none')) << svc
+		(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
 	end
 
 	return rv
@@ -230,7 +230,7 @@ module Allah
 		def group
 			File.read(File.join(@svcdir, 'group')).first.strip
 		rescue
-			nil
+			'(ungrouped)'
 		end
 
 		def start
@@ -324,7 +324,7 @@ module Allah
 		attr_reader :name, :services
 
 		def initialize(name)
-			@name = name || 'nil'
+			@name = name
 			@services = []
 		end
 
