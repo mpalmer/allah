@@ -127,9 +127,9 @@ def do_status(svc_or_group_or_nil, check = false)
 		return GOD ? RC_ERR : RC_USAGE
 	elsif sgn == :all
 		sts = []
-		svclist[:groups].values.each do |g|
+		svclist[:groups].values.sort.each do |g|
 			puts "#{g.name}:"
-			g.services.each do |s|
+			g.services.sort.each do |s|
 				st = check ? s.check : s.status
 				puts "  #{s.name}: #{st}"
 				sts << st
@@ -141,7 +141,7 @@ def do_status(svc_or_group_or_nil, check = false)
 		return RC_OTHER
 	elsif sgn.is_a? Allah::Group
 		puts "#{sgn.name}:"
-		sts = sgn.services.map do |s|
+		sts = sgn.services.sort.map do |s|
 			st = check ? s.check : s.status
 			puts "  #{s.name}: #{st}"
 			st
