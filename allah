@@ -51,7 +51,7 @@ def do_help
       stop <task or group name>          stop task or group
       monitor <task or group name>       monitor task or group
       unmonitor <task or group name>     unmonitor task or group
-      remove <task or group name>        remove task or group from god
+      remove <task or group name>        remove task or group from #{BASENAME}
       log <task or group name>           show realtime log for given task
       status [task or group name]        show status
 EOF
