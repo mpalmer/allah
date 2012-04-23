@@ -336,8 +336,8 @@ module Allah
 		end
 
 		def method_missing(method, *args)
-			super unless [:start, :stop, :restart, :remove, :monitor, :unmonitor].include?(method)
-			@services.each { |s| s.send(method) }
+			super unless [:start, :stop, :restart, :signal, :remove, :monitor, :unmonitor].include?(method)
+			@services.each { |s| s.send(method, *args) }
 		end
 	end
 end
