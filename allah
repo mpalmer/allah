@@ -342,4 +342,10 @@ module Allah
 	end
 end
 
-main if $0 == __FILE__
+begin
+	main if $0 == __FILE__
+rescue => e
+	$stderr.puts "#{e.backtrace.first}: #{e} (#{e.class})"
+	e.backtrace[1..-1].each { |bt| $stderr.puts "	from #{bt}" }
+	exit! RC_TEMP
+end
