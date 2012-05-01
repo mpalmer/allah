@@ -183,9 +183,12 @@ end
 # digging out it's cwd.  Exit unsuccessfully if not found.
 def svdir
 	Dir["/proc/*"].each do |p|
-		File.exists?(File.join(p, 'exe')) or next
-		File.readlink(File.join(p, 'exe')).split("\000")[0] =~ %r{/svscan$} or next
-		return File.readlink(File.join(p, 'cwd'))
+		begin
+			File.readlink(File.join(p, 'exe')).split("\000")[0] =~ %r{/svscan$} or next
+			return File.readlink(File.join(p, 'cwd'))
+		rescue
+			nil
+		end
 	end
 
 	$stderr.puts "Failed to find service dir.  Is svscan running?"
