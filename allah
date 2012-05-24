@@ -179,23 +179,14 @@ def do_signal(svc_or_group, sig)
 	end
 end
 
-# Find the service dir by the sneaky means of looking for an svscan and
-# digging out it's cwd.  Exit unsuccessfully if not found.
 def svdir
-	Dir["/proc/*"].each do |p|
-		begin
-			File.readlink(File.join(p, 'exe')).split("\000")[0] =~ %r{/svscan$} or next
-			return File.readlink(File.join(p, 'cwd'))
-		rescue
-			nil
-		end
-	end
-
-	$stderr.puts "Failed to find service dir.  Is svscan running?"
-	exit RC_TEMP
+	dir = ENV['ALLAH_SERVICE_DIR']
+	dir = '/etc/service' if dir.nil? or dir.empty?
+	dir
 end
 
-# Scan the system's service dir and return a hash with two keys:
+# Change to the system's service dir, scan for services, and return a hash
+# with two keys:
 #
 #  - :services -- a hash of svcname => Allah::Service instances,
 #     representing the services configured; and
@@ -204,7 +195,14 @@ end
 def scan_services
 	rv = { :services => {}, :groups => {} }
 
-	Dir[File.join(svdir, '*')].each do |s|
+	begin
+		Dir.chdir(svdir)
+	rescue SystemCallError => e
+		$stderr.puts "Unable to change to service dir: #{e}"
+		exit RC_TEMP
+	end
+
+	Dir['*'].each do |s|
 		File.exists?(File.join(s, 'supervise')) or next
 		svc = Allah::Service.new(s)
 		rv[:services][svc.name] = svc
