@@ -193,7 +193,7 @@ end
 #  - :groups -- a hash of groupname => Allah::Group instances, representing
 #     the groups that have been configured.
 def scan_services
-	rv = { :services => {}, :groups => {} }
+	rv = { :services => {}, :groups => Hash.new { |h,k| h[k] = Allah::Group.new(k) } }
 
 	begin
 		Dir.chdir(svdir)
@@ -206,7 +206,7 @@ def scan_services
 		File.exists?(File.join(s, 'supervise')) or next
 		svc = Allah::Service.new(s)
 		rv[:services][svc.name] = svc
-		(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
+		svc.groups.each { |g| rv[:groups][g] << svc }
 	end
 
 	return rv
@@ -225,12 +225,13 @@ module Allah
 			@name <=> other.name
 		end
 
-		# Read the service's group file and return the name of
-		# the group, or nil if the file doesn't exist
-		def group
-			File.read(File.join(@svcdir, 'group')).first.strip
+		# Read the service's group file and return the array of group names
+		# -- this can legitimately be empty if the service is part of no
+		# groups
+		def groups
+			File.read(File.join(@svcdir, 'group')).strip.split(/\s+/)
 		rescue
-			'(ungrouped)'
+			['(ungrouped)']
 		end
 
 		def start
@@ -292,6 +293,11 @@ module Allah
 
 		# Are you up, or down, or confused?
 		def status
+			@status ||= get_status
+		end
+		
+		def get_status
+			st = nil
 			if `svstat #{@svcdir}` =~ /: (up|down)/
 				st = $1.to_sym
 				st = :unmonitored if GOD and st == :down
@@ -302,6 +308,10 @@ module Allah
 		end
 
 		def check
+			@check ||= do_check
+		end
+		
+		def do_check
 			st = status
 			return st unless st == :up
 
@@ -311,7 +321,6 @@ module Allah
 					st = :failed unless system(cmd)
 				end
 			end
-
 			st
 		end
 
