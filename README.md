@@ -31,11 +31,10 @@ And go from there.
 # How do I group services together?
 
 Simply create a file in your service directory (`/etc/service/whatever`)
-named `group`, containing one or more whitespace-separated group names. 
-service is a part of (eg `echo thins >/etc/service/thin0/group` or `echo
-customer resque customer_workers >/etc/service/customer_resque_12/group`). 
-All services with the same group name can be controlled together by
-providing the group name to the `start`/`stop`/`restart`/etc commands.
+named `group`, containing a single line with the name of the group that the
+service is a part of (eg `cat thins >/etc/service/thin0/group`).  All
+services with the same group name can be controlled together by providing
+the group name to the `start`/`stop`/`restart`/etc commands.
 
 
 # Compatibility
