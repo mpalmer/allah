@@ -105,7 +105,7 @@ def do_log(svc)
 	exec "tail --follow=name #{logfiles.join(' ')} | tai64nlocal"
 
 	# This function, if successfully executed, never returns
-	raise RuntimeError.new "Can't happen: dropped out the bottom of do_log"
+	raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
 end
 
 def do_status(svc_or_group_or_nil, check = false)
