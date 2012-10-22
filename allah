@@ -195,6 +195,11 @@ end
 def scan_services
 	rv = { :services => {}, :groups => {} }
 
+	unless File.readable?(svdir)
+		$stderr.puts "Unable to access service dir #{svdir}; do you need to run as root?"
+		exit RC_TEMP
+	end
+
 	begin
 		Dir.chdir(svdir)
 	rescue SystemCallError => e
