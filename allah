@@ -17,19 +17,19 @@ RC_USAGE = 127
 
 def main
 	exit case ARGV[0]
-		when nil:         do_help
-		when 'help':      do_help
-		when '--help':    do_help
-		when 'start':     do_action(ARGV[1], :start)
-		when 'restart':   do_action(ARGV[1], :restart)
-		when 'stop':      do_action(ARGV[1], :stop)
-		when 'remove':    do_action(ARGV[1], :remove)
-		when 'monitor':   do_action(ARGV[1], :monitor)
-		when 'unmonitor': do_action(ARGV[1], :unmonitor)
-		when 'log':       do_log(ARGV[1])
-		when 'status':    do_status(ARGV[1])
-		when 'check':     GOD ? 0 : do_status(ARGV[1], true)
-		when 'signal':    do_signal(ARGV[1], ARGV[2])
+		when nil         then do_help
+		when 'help'      then do_help
+		when '--help'    then do_help
+		when 'start'     then do_action(ARGV[1], :start)
+		when 'restart'   then do_action(ARGV[1], :restart)
+		when 'stop'      then do_action(ARGV[1], :stop)
+		when 'remove'    then do_action(ARGV[1], :remove)
+		when 'monitor'   then do_action(ARGV[1], :monitor)
+		when 'unmonitor' then do_action(ARGV[1], :unmonitor)
+		when 'log'       then do_log(ARGV[1])
+		when 'status'    then do_status(ARGV[1])
+		when 'check'     then GOD ? 0 : do_status(ARGV[1], true)
+		when 'signal'    then do_signal(ARGV[1], ARGV[2])
 		else
 			puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
 			GOD ? RC_ERR : RC_USAGE
@@ -276,16 +276,16 @@ module Allah
 		# if the signal was delivered, or false otherwise
 		def signal(sig)
 			opt = case sig
-				when "UP":         '-u'
-				when "DOWN":       '-d'
-				when "ONCE":       '-o'
-				when "STOP":       '-p'
-				when "CONT":       '-c'
-				when "HUP",   "1": '-h'
-				when "ALRM", "14": '-a'
-				when "INT",   "2": '-i'
-				when "TERM", "15": '-t'
-				when "KILL",  "9": '-k'
+				when "UP"         then '-u'
+				when "DOWN"       then '-d'
+				when "ONCE"       then '-o'
+				when "STOP"       then '-p'
+				when "CONT"       then '-c'
+				when "HUP",   "1" then '-h'
+				when "ALRM", "14" then '-a'
+				when "INT",   "2" then '-i'
+				when "TERM", "15" then '-t'
+				when "KILL",  "9" then '-k'
 				else
 					puts "Unknown signal: #{sig}"
 					return false
