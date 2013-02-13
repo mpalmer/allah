@@ -233,7 +233,7 @@ module Allah
 		# Read the service's group file and return the name of
 		# the group, or nil if the file doesn't exist
 		def group
-			File.read(File.join(@svcdir, 'group'))[0].strip
+			File.open(File.join(@svcdir, 'group')).readline.strip
 		rescue
 			'(ungrouped)'
 		end
