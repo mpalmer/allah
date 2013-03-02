@@ -17,7 +17,11 @@ signal" -- "$word") )
 		local words=("${COMP_WORDS[@]}")
 		unset words[0]
 		unset words[$COMP_CWORD]
-		local completions=$(ls /etc/service/)
+		if [ $UID -eq 0 ]; then
+			local completions=$(ls /etc/service/)
+		else
+			local completions=$(sudo -l | grep allah | sed -r 's/^.+allah\s+\w+\s+//' | cut -d ' ' -f 1 | sort | uniq)
+		fi
 		COMPREPLY=( $(compgen -W "$completions" -- "$word") )
 	fi
 

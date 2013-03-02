@@ -20,7 +20,11 @@ status
 check
 signal"
 	elif [ "${#words}" -eq 3 ]; then
-		completions="$(ls /var/lib/service/)"
+		if [ $UID -eq 0 ]; then
+			completions="$(ls /var/lib/service/)"
+		else
+			completions=$(sudo -l | grep allah | sed -r 's/^.+allah\s+\w+\s+//' | cut -d ' ' -f 1 | sort | uniq)
+		fi
 	fi
 
 	if [ "${#words}" -lt 4 ]; then
