@@ -275,17 +275,20 @@ module Allah
 		# Send the specified signal to the service.  Returns true
 		# if the signal was delivered, or false otherwise
 		def signal(sig)
-			opt = case sig
+			opt = case sig.upcase
 				when "UP"         then '-u'
 				when "DOWN"       then '-d'
 				when "ONCE"       then '-o'
-				when "STOP"       then '-p'
-				when "CONT"       then '-c'
+				when "STOP", "19" then '-p'
+				when "CONT", "18" then '-c'
 				when "HUP",   "1" then '-h'
 				when "ALRM", "14" then '-a'
 				when "INT",   "2" then '-i'
 				when "TERM", "15" then '-t'
 				when "KILL",  "9" then '-k'
+				when "QUIT",  "3" then '-q'
+				when "USR1", "10" then '-1'
+				when "USR2", "12" then '-2'
 				else
 					puts "Unknown signal: #{sig}"
 					return false
