@@ -15,212 +15,218 @@ RC_OTHER = 2
 RC_TEMP  = 126
 RC_USAGE = 127
 
-def main
-	exit case ARGV[0]
-		when nil         then do_help
-		when 'help'      then do_help
-		when '--help'    then do_help
-		when 'start'     then do_action(ARGV[1], :start)
-		when 'restart'   then do_action(ARGV[1], :restart)
-		when 'stop'      then do_action(ARGV[1], :stop)
-		when 'remove'    then do_action(ARGV[1], :remove)
-		when 'monitor'   then do_action(ARGV[1], :monitor)
-		when 'unmonitor' then do_action(ARGV[1], :unmonitor)
-		when 'smite'     then do_action(ARGV[1], :smite)
-		when 'log'       then do_log(ARGV[1])
-		when 'status'    then do_status(ARGV[1])
-		when 'check'     then GOD ? 0 : do_status(ARGV[1], true)
-		when 'signal'    then do_signal(ARGV[1], ARGV[2])
-		else
-			puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
-			GOD ? RC_ERR : RC_USAGE
-	end
-end
-
-def do_help
-	puts <<EOF
-  Usage:
-    #{BASENAME} <command> [arguments]
-
-    Commands:
-      start <task or group name>         start task or group
-      restart <task or group name>       restart task or group
-      stop <task or group name>          stop task or group
-      monitor <task or group name>       monitor task or group
-      unmonitor <task or group name>     unmonitor task or group
-      remove <task or group name>        remove task or group from #{BASENAME}
-      log <task or group name>           show realtime log for given task
-      status [task or group name]        show status
-EOF
-	unless GOD
-		puts <<EOF
-      check [task or group name]         show status and run task checks
-      smite <task or group name>         stop task or group, and make *sure* it's down
-EOF
-	end
-	puts <<EOF
-      signal <task or group name> <sig>  signal all matching tasks
-EOF
-	return RC_OK
-end
-
-def do_action(svc_or_group, action)
-	svclist = scan_services
-
-	ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
-	if ctl.nil?
-		puts "Task or Group '#{svc_or_group}' not found"
-		return GOD ? RC_ERR : RC_USAGE
-	end
-
-	ctl.send(action) ? RC_OK : RC_ERR
-end
-
-def do_log(svc)
-	if svc.nil?
-		puts "You must specify a Task name"
-		return GOD ? RC_ERR : RC_USAGE
-	end
-
-	svclist = scan_services
-	logfiles = []
-
-	if svclist[:services][svc]
-		logfiles = [svclist[:services][svc].logfile]
-		if logfiles[0].nil?
-			puts "Cannot find logfile for service #{svc}"
-			return RC_ERR
-		end
-	elsif svclist[:groups][svc]
-		logfiles = svclist[:groups][svc].services.map do |s|
-			if s.logfile.nil?
-				puts "Cannot find logfile for service #{s.name} (part of group #{svc})"
-				return RC_ERR
-			end
-			s.logfile
-		end
-	else
-		puts "Task '#{svc}' not found"
-		return GOD ? RC_ERR : RC_USAGE
-	end
-
-	exec "tail --follow=name #{logfiles.join(' ')} | tai64nlocal"
-
-	# This function, if successfully executed, never returns
-	raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
-end
-
-def do_status(svc_or_group_or_nil, check = false)
-	svclist = scan_services
-
-	sgn = :all
-	unless svc_or_group_or_nil.nil?
-		sgn = svclist[:groups][svc_or_group_or_nil] ||
-		      svclist[:services][svc_or_group_or_nil] ||
-		      nil
-	end
-
-	if sgn.nil?
-		puts "Task or Group '#{svc_or_group_or_nil}' not found."
-		return GOD ? RC_ERR : RC_USAGE
-	elsif sgn == :all
-		sts = []
-		svclist[:groups].values.sort.each do |g|
-			puts "#{g.name}:"
-			g.services.sort.each do |s|
-				st = check ? s.check : s.status
-				uptime = (GOD or st != :up) ? '' : " (#{s.uptime} seconds)"
-				puts "  #{s.name}: #{st}#{uptime}"
-				sts << st
-			end
-		end
-		return RC_OK   if GOD
-		return RC_UP   if sts.all? { |st| st == :up   }
-		return RC_DOWN if sts.all? { |st| st == :down }
-		return RC_OTHER
-	elsif sgn.is_a? Allah::Group
-		puts "#{sgn.name}:"
-		sts = sgn.services.sort.map do |s|
-			st = check ? s.check : s.status
-			puts "  #{s.name}: #{st}"
-			st
-		end
-		return sts.count(:unmonitored) if GOD
-		return RC_UP    if sts.all? { |st| st == :up   }
-		return RC_DOWN  if sts.all? { |st| st == :down }
-		return RC_OTHER
-	else
-		st = check ? sgn.check : sgn.status
-		puts "#{sgn.name}: #{st}"
-		if GOD
-			return RC_OK if st == :up
-			return RC_ERR
-		else
-			return RC_UP   if st == :up
-			return RC_DOWN if st == :down
-			return RC_OTHER
-		end
-	end
-end
-
-def do_signal(svc_or_group, sig)
-	svclist = scan_services
-
-	sgn = svclist[:groups][svc_or_group] ||
-	      svclist[:services][svc_or_group] ||
-	      nil
-
-	puts "Sending signal '#{sig}' to '#{svc_or_group}'"
-	puts
-
-	if sgn.nil?
-		puts "No matching task or group"
-		# Emulate weird God exit status
-		GOD ? RC_OK : RC_USAGE
-	else
-		sgn.signal(sig) ? RC_OK : RC_ERR
-	end
-end
-
-def svdir
-	dir = ENV['ALLAH_SERVICE_DIR']
-	dir = '/etc/service' if dir.nil? or dir.empty?
-	dir
-end
-
-# Change to the system's service dir, scan for services, and return a hash
-# with two keys:
-#
-#  - :services -- a hash of svcname => Allah::Service instances,
-#     representing the services configured; and
-#  - :groups -- a hash of groupname => Allah::Group instances, representing
-#     the groups that have been configured.
-def scan_services
-	rv = { :services => {}, :groups => {} }
-
-	unless File.readable?(svdir)
-		$stderr.puts "Unable to access service dir #{svdir}; do you need to run as root?"
-		exit RC_TEMP
-	end
-
-	begin
-		Dir.chdir(svdir)
-	rescue SystemCallError => e
-		$stderr.puts "Unable to change to service dir: #{e}"
-		exit RC_TEMP
-	end
-
-	Dir['*'].each do |s|
-		File.exists?(File.join(s, 'supervise')) or next
-		svc = Allah::Service.new(s)
-		rv[:services][svc.name] = svc
-		(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
-	end
-
-	return rv
-end
-
 module Allah
+	class CLI
+		def initialize(argv)
+			@argv = argv
+		end
+		
+		def run
+			case @argv[0]
+				when nil         then do_help
+				when 'help'      then do_help
+				when '--help'    then do_help
+				when 'start'     then do_action(ARGV[1], :start)
+				when 'restart'   then do_action(ARGV[1], :restart)
+				when 'stop'      then do_action(ARGV[1], :stop)
+				when 'remove'    then do_action(ARGV[1], :remove)
+				when 'monitor'   then do_action(ARGV[1], :monitor)
+				when 'unmonitor' then do_action(ARGV[1], :unmonitor)
+				when 'smite'     then do_action(ARGV[1], :smite)
+				when 'log'       then do_log(ARGV[1])
+				when 'status'    then do_status(ARGV[1])
+				when 'check'     then GOD ? 0 : do_status(ARGV[1], true)
+				when 'signal'    then do_signal(ARGV[1], ARGV[2])
+				else
+					puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
+					GOD ? RC_ERR : RC_USAGE
+			end
+		end
+
+		def do_help
+			puts <<EOF
+		  Usage:
+			 #{BASENAME} <command> [arguments]
+
+			 Commands:
+				start <task or group name>         start task or group
+				restart <task or group name>       restart task or group
+				stop <task or group name>          stop task or group
+				monitor <task or group name>       monitor task or group
+				unmonitor <task or group name>     unmonitor task or group
+				remove <task or group name>        remove task or group from #{BASENAME}
+				log <task or group name>           show realtime log for given task
+				status [task or group name]        show status
+EOF
+			unless GOD
+				puts <<EOF
+				check [task or group name]         show status and run task checks
+				smite <task or group name>         stop task or group, and make *sure* it's down
+EOF
+			end
+			puts <<EOF
+				signal <task or group name> <sig>  signal all matching tasks
+EOF
+			return RC_OK
+		end
+
+		def do_action(svc_or_group, action)
+			svclist = scan_services
+
+			ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
+			if ctl.nil?
+				puts "Task or Group '#{svc_or_group}' not found"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			ctl.send(action) ? RC_OK : RC_ERR
+		end
+
+		def do_log(svc)
+			if svc.nil?
+				puts "You must specify a Task name"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			svclist = scan_services
+			logfiles = []
+
+			if svclist[:services][svc]
+				logfiles = [svclist[:services][svc].logfile]
+				if logfiles[0].nil?
+					puts "Cannot find logfile for service #{svc}"
+					return RC_ERR
+				end
+			elsif svclist[:groups][svc]
+				logfiles = svclist[:groups][svc].services.map do |s|
+					if s.logfile.nil?
+						puts "Cannot find logfile for service #{s.name} (part of group #{svc})"
+						return RC_ERR
+					end
+					s.logfile
+				end
+			else
+				puts "Task '#{svc}' not found"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			exec "tail --follow=name #{logfiles.join(' ')} | tai64nlocal"
+
+			# This function, if successfully executed, never returns
+			raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
+		end
+
+		def do_status(svc_or_group_or_nil, check = false)
+			svclist = scan_services
+
+			sgn = :all
+			unless svc_or_group_or_nil.nil?
+				sgn = svclist[:groups][svc_or_group_or_nil] ||
+						svclist[:services][svc_or_group_or_nil] ||
+						nil
+			end
+
+			if sgn.nil?
+				puts "Task or Group '#{svc_or_group_or_nil}' not found."
+				return GOD ? RC_ERR : RC_USAGE
+			elsif sgn == :all
+				sts = []
+				svclist[:groups].values.sort.each do |g|
+					puts "#{g.name}:"
+					g.services.sort.each do |s|
+						st = check ? s.check : s.status
+						uptime = (GOD or st != :up) ? '' : " (#{s.uptime} seconds)"
+						puts "  #{s.name}: #{st}#{uptime}"
+						sts << st
+					end
+				end
+				return RC_OK   if GOD
+				return RC_UP   if sts.all? { |st| st == :up   }
+				return RC_DOWN if sts.all? { |st| st == :down }
+				return RC_OTHER
+			elsif sgn.is_a? Allah::Group
+				puts "#{sgn.name}:"
+				sts = sgn.services.sort.map do |s|
+					st = check ? s.check : s.status
+					puts "  #{s.name}: #{st}"
+					st
+				end
+				return sts.count(:unmonitored) if GOD
+				return RC_UP    if sts.all? { |st| st == :up   }
+				return RC_DOWN  if sts.all? { |st| st == :down }
+				return RC_OTHER
+			else
+				st = check ? sgn.check : sgn.status
+				puts "#{sgn.name}: #{st}"
+				if GOD
+					return RC_OK if st == :up
+					return RC_ERR
+				else
+					return RC_UP   if st == :up
+					return RC_DOWN if st == :down
+					return RC_OTHER
+				end
+			end
+		end
+
+		def do_signal(svc_or_group, sig)
+			svclist = scan_services
+
+			sgn = svclist[:groups][svc_or_group] ||
+					svclist[:services][svc_or_group] ||
+					nil
+
+			puts "Sending signal '#{sig}' to '#{svc_or_group}'"
+			puts
+
+			if sgn.nil?
+				puts "No matching task or group"
+				# Emulate weird God exit status
+				GOD ? RC_OK : RC_USAGE
+			else
+				sgn.signal(sig) ? RC_OK : RC_ERR
+			end
+		end
+
+		def svdir
+			dir = ENV['ALLAH_SERVICE_DIR']
+			dir = '/etc/service' if dir.nil? or dir.empty?
+			dir
+		end
+
+		# Change to the system's service dir, scan for services, and return a hash
+		# with two keys:
+		#
+		#  - :services -- a hash of svcname => Allah::Service instances,
+		#     representing the services configured; and
+		#  - :groups -- a hash of groupname => Allah::Group instances, representing
+		#     the groups that have been configured.
+		def scan_services
+			rv = { :services => {}, :groups => {} }
+
+			unless File.readable?(svdir)
+				$stderr.puts "Unable to access service dir #{svdir}; do you need to run as root?"
+				exit RC_TEMP
+			end
+
+			begin
+				Dir.chdir(svdir)
+			rescue SystemCallError => e
+				$stderr.puts "Unable to change to service dir: #{e}"
+				exit RC_TEMP
+			end
+
+			Dir['*'].each do |s|
+				File.exists?(File.join(s, 'supervise')) or next
+				svc = Allah::Service.new(s)
+				rv[:services][svc.name] = svc
+				(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
+			end
+
+			return rv
+		end
+	end
+
 	class Service
 		attr_reader :name
 
@@ -369,7 +375,7 @@ module Allah
 end
 
 begin
-	main if $0 == __FILE__
+	exit Allah::CLI.new(ARGV).run if $0 == __FILE__
 rescue => e
 	$stderr.puts "#{e.backtrace[0]}: #{e} (#{e.class})"
 	e.backtrace[1..-1].each { |bt| $stderr.puts "	from #{bt}" }
