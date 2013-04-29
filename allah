@@ -315,7 +315,7 @@ EOF
 					return false
 			end
 
-			rc = system("svc #{opt} #{@svcdir}")
+			rc = Kernel.system("svc #{opt} #{@svcdir}")
 			GOD ? true : rc
 		end
 
@@ -337,7 +337,7 @@ EOF
 			Dir.chdir(@svcdir) do
 				cmd = "./check"
 				if File.file?(cmd) and File.executable?(cmd)
-					st = :failed unless system(cmd)
+					st = :failed unless Kernel.system(cmd)
 				end
 			end
 
