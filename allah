@@ -26,19 +26,19 @@ module Allah
 				when nil         then do_help
 				when 'help'      then do_help
 				when '--help'    then do_help
-				when 'start'     then do_action(ARGV[1], :start)
-				when 'restart'   then do_action(ARGV[1], :restart)
-				when 'stop'      then do_action(ARGV[1], :stop)
-				when 'remove'    then do_action(ARGV[1], :remove)
-				when 'monitor'   then do_action(ARGV[1], :monitor)
-				when 'unmonitor' then do_action(ARGV[1], :unmonitor)
-				when 'smite'     then do_action(ARGV[1], :smite)
-				when 'log'       then do_log(ARGV[1])
-				when 'status'    then do_status(ARGV[1])
-				when 'check'     then GOD ? 0 : do_status(ARGV[1], true)
-				when 'signal'    then do_signal(ARGV[1], ARGV[2])
+				when 'start'     then do_action(@argv[1], :start)
+				when 'restart'   then do_action(@argv[1], :restart)
+				when 'stop'      then do_action(@argv[1], :stop)
+				when 'remove'    then do_action(@argv[1], :remove)
+				when 'monitor'   then do_action(@argv[1], :monitor)
+				when 'unmonitor' then do_action(@argv[1], :unmonitor)
+				when 'smite'     then do_action(@argv[1], :smite)
+				when 'log'       then do_log(@argv[1])
+				when 'status'    then do_status(@argv[1])
+				when 'check'     then GOD ? 0 : do_status(@argv[1], true)
+				when 'signal'    then do_signal(@argv[1], @argv[2])
 				else
-					puts "Command #{ARGV[0]} is not valid. Run '#{$0} --help' for usage"
+					puts "Command #{@argv[0]} is not valid. Run '#{$0} --help' for usage"
 					GOD ? RC_ERR : RC_USAGE
 			end
 		end
