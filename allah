@@ -26,6 +26,7 @@ def main
 		when 'remove'    then do_action(ARGV[1], :remove)
 		when 'monitor'   then do_action(ARGV[1], :monitor)
 		when 'unmonitor' then do_action(ARGV[1], :unmonitor)
+		when 'smite'     then do_action(ARGV[1], :smite)
 		when 'log'       then do_log(ARGV[1])
 		when 'status'    then do_status(ARGV[1])
 		when 'check'     then GOD ? 0 : do_status(ARGV[1], true)
@@ -54,6 +55,7 @@ EOF
 	unless GOD
 		puts <<EOF
       check [task or group name]         show status and run task checks
+      smite <task or group name>         stop task or group, and make *sure* it's down
 EOF
 	end
 	puts <<EOF
@@ -244,8 +246,9 @@ module Allah
 
 		def stop
 			if GOD
-				6.times { signal("DOWN"); return 0 if [:down, :unmonitored].include? status; sleep 1 }
-				signal("KILL")
+				# god is very violent by default; allah is far more gentle, but
+				# is available for smiting separately if required
+				smite
 			else
 				signal("DOWN")
 			end
@@ -270,6 +273,11 @@ module Allah
 
 		def unmonitor
 			signal("ONCE")
+		end
+
+		def smite
+			6.times { signal("DOWN"); return 0 if [:down, :unmonitored].include? status; sleep 1 }
+			signal("KILL")
 		end
 
 		# Send the specified signal to the service.  Returns true
@@ -345,7 +353,7 @@ module Allah
 		end
 
 		def method_missing(method, *args)
-			super unless [:start, :stop, :restart, :signal, :remove, :monitor, :unmonitor].include?(method)
+			super unless [:start, :stop, :restart, :signal, :remove, :monitor, :unmonitor, :smite].include?(method)
 			@services.each { |s| s.send(method, *args) }
 		end
 	end
