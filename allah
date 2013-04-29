@@ -129,7 +129,8 @@ def do_status(svc_or_group_or_nil, check = false)
 			puts "#{g.name}:"
 			g.services.sort.each do |s|
 				st = check ? s.check : s.status
-				puts "  #{s.name}: #{st}"
+				uptime = (GOD or st != :up) ? '' : " (#{s.uptime} seconds)"
+				puts "  #{s.name}: #{st}#{uptime}"
 				sts << st
 			end
 		end
@@ -329,6 +330,14 @@ module Allah
 			end
 
 			st
+		end
+		
+		def uptime
+			if `svstat #{@svcdir}` =~ /: up \(pid \d+\) (\d+) seconds/
+				$1.to_i
+			else
+				nil
+			end
 		end
 
 		def logfile
