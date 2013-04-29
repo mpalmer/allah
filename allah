@@ -16,6 +16,38 @@ RC_TEMP  = 126
 RC_USAGE = 127
 
 module Allah
+	# Change to the specified service dir, scan for services, and return a hash
+	# with two keys:
+	#
+	#  - :services -- a hash of svcname => Allah::Service instances,
+	#     representing the services configured; and
+	#  - :groups -- a hash of groupname => Allah::Group instances, representing
+	#     the groups that have been configured.
+	def self.scan_services(svdir)
+		rv = { :services => {}, :groups => {} }
+
+		unless File.readable?(svdir)
+			$stderr.puts "Unable to access service dir #{svdir}; do you need to run as root?"
+			return nil
+		end
+
+		begin
+			Dir.chdir(svdir)
+		rescue SystemCallError => e
+			$stderr.puts "Unable to change to service dir: #{e}"
+			return nil
+		end
+
+		Dir['*'].each do |s|
+			File.exists?(File.join(s, 'supervise')) or next
+			svc = Allah::Service.new(s)
+			rv[:services][svc.name] = svc
+			(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
+		end
+
+		return rv
+	end
+
 	class CLI
 		def initialize(argv)
 			@argv = argv
@@ -71,7 +103,8 @@ EOF
 		end
 
 		def do_action(svc_or_group, action)
-			svclist = scan_services
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
 
 			ctl = svclist[:groups][svc_or_group] || svclist[:services][svc_or_group]
 			if ctl.nil?
@@ -88,7 +121,9 @@ EOF
 				return GOD ? RC_ERR : RC_USAGE
 			end
 
-			svclist = scan_services
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
+			
 			logfiles = []
 
 			if svclist[:services][svc]
@@ -117,7 +152,8 @@ EOF
 		end
 
 		def do_status(svc_or_group_or_nil, check = false)
-			svclist = scan_services
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
 
 			sgn = :all
 			unless svc_or_group_or_nil.nil?
@@ -170,7 +206,8 @@ EOF
 		end
 
 		def do_signal(svc_or_group, sig)
-			svclist = scan_services
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
 
 			sgn = svclist[:groups][svc_or_group] ||
 					svclist[:services][svc_or_group] ||
@@ -194,37 +231,6 @@ EOF
 			dir
 		end
 
-		# Change to the system's service dir, scan for services, and return a hash
-		# with two keys:
-		#
-		#  - :services -- a hash of svcname => Allah::Service instances,
-		#     representing the services configured; and
-		#  - :groups -- a hash of groupname => Allah::Group instances, representing
-		#     the groups that have been configured.
-		def scan_services
-			rv = { :services => {}, :groups => {} }
-
-			unless File.readable?(svdir)
-				$stderr.puts "Unable to access service dir #{svdir}; do you need to run as root?"
-				exit RC_TEMP
-			end
-
-			begin
-				Dir.chdir(svdir)
-			rescue SystemCallError => e
-				$stderr.puts "Unable to change to service dir: #{e}"
-				exit RC_TEMP
-			end
-
-			Dir['*'].each do |s|
-				File.exists?(File.join(s, 'supervise')) or next
-				svc = Allah::Service.new(s)
-				rv[:services][svc.name] = svc
-				(rv[:groups][svc.group] ||= Allah::Group.new(svc.group)) << svc
-			end
-
-			return rv
-		end
 	end
 
 	class Service
