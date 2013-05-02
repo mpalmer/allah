@@ -25,4 +25,21 @@ class CoreTest < Test::Unit::TestCase
 		groupedsvc = dummygroup.services.find { |s| s.name == "groupedsvc" }
 		assert groupedsvc, "Could not find groupedsvc in dummygroup (#{dummygroup.inspect})"
 	end
+
+	def test_scan_services_returns_multigroups
+		assert @svclist[:groups].keys.include?("a"), "Groups list does not include group 'a'"
+		assert @svclist[:groups].keys.include?("b"), "Groups list does not include group 'b'"
+		assert @svclist[:groups].keys.include?("c"), "Groups list does not include group 'c'"
+	end
+	
+	def test_scan_services_multigroups_includes_correct_services
+		assert_equal %w{multigroup_a_b  multigroup_a_b_c},
+		             @svclist[:groups]['a'].services.map { |s| s.name }.sort
+
+		assert_equal %w{multigroup_a_b  multigroup_a_b_c  multigroup_b_c},
+		             @svclist[:groups]['b'].services.map { |s| s.name }.sort
+
+		assert_equal %w{multigroup_a_b_c multigroup_b_c},
+		             @svclist[:groups]['c'].services.map { |s| s.name }.sort
+	end
 end

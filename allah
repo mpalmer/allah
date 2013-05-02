@@ -42,7 +42,12 @@ module Allah
 			File.exists?(File.join(s, 'supervise')) or next
 			svc = Allah::Service.new(s)
 			rv[:services][svc.name] = svc
-			(rv[:groups][svc.group || '(ungrouped)'] ||= Allah::Group.new(svc.group || '(ungrouped)')) << svc
+			groups = svc.groups
+			# Make sure everyone gets into at least one group
+			groups = ['(ungrouped)'] if groups.empty?
+			groups.each do |g|
+				(rv[:groups][g] ||= Allah::Group.new(g)) << svc
+			end
 		end
 
 		return rv
@@ -245,12 +250,14 @@ EOF
 			@name <=> other.name
 		end
 
-		# Read the service's group file and return the name of
-		# the group, or nil if the file doesn't exist
-		def group
-			File.readlines(File.join(@svcdir, 'group'))[0].strip
-		rescue
-			nil
+		# Read the service's group file and return an array of all groups this
+		# service is in, or an empty array if the service isn't in any groups.
+		def groups
+			@groups ||= begin
+				File.readlines(File.join(@svcdir, 'group')).map { |g| g.strip }
+			rescue Exception => e
+				[]
+			end
 		end
 
 		def start
