@@ -176,7 +176,7 @@ EOF
 					puts "#{g.name}:"
 					g.services.sort.each do |s|
 						st = check ? s.check : s.status
-						uptime = (GOD or st != :up) ? '' : " (#{s.uptime} seconds)"
+						uptime = (GOD or st != :up) ? '' : " (#{s.uptime} seconds, PID #{s.pid})"
 						puts "  #{s.name}: #{st}#{uptime}"
 						sts << st
 					end
@@ -352,10 +352,21 @@ EOF
 		end
 		
 		def uptime
-			if `svstat #{@svcdir}` =~ /: up \(pid \d+\) (\d+) seconds/
-				$1.to_i
-			else
-				nil
+			parse_svstat
+			@uptime
+		end
+		
+		def pid
+			parse_svstat
+			@pid
+		end
+		
+		def parse_svstat
+			return if @uptime and @pid
+			
+			if `svstat #{@svcdir}` =~ /: up \(pid (\d+)\) (\d+) seconds/
+				@pid = $1
+				@uptime = $2
 			end
 		end
 
