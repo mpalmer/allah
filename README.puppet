@@ -1,0 +1,65 @@
+Allah
+-----
+
+This module ships a script, known as "allah", which provides a (mostly)
+"god"-compatible CLI to manage services and groups.  You can use this on any
+machine to manage the services that run under daemontools.
+
+To install the script, merely
+
+    include allah::script
+
+
+allah::check
+------------
+
+Manages a check script for Allah. The namevar must be the name of a
+Daemontools::Service resource.
+
+    # Check script taken from Puppet's fileserver
+    allah::check { "someservice":
+        source  => "puppet:///modules/blah/path/to/check";
+    }
+
+    # Check script generated from a Puppet template
+    allah::check { "someservice":
+        content => template("modules/blah/path/to/check");
+    }
+
+An Allah check script will be invoked when "allah check <service>" is called
+and daemontools claims the service is up. It should perform additional
+probes on the service and return with an exit status of zero if and only if
+the service is actually usable.
+
+Parameters are as follows:
+
+  ensure
+    The desired state of the check script, either "present" or "absent".
+    Defaults to "present".
+  source
+  content
+    The source or content to use as the check, if ensure is "present".
+
+allah::sudo
+-----------
+
+    allah::sudo { "someservice/allow-freddy":
+        service           => "someservice",
+        user              => "freddy",
+        god_compatibility => true;
+    }
+
+Configures Sudo to allow a user to invoke "allah <action> <service>".
+
+Parameters are as follows:
+
+  service (required)
+    The daemontools service to be managed. This may be a glob to match
+    multiple services.
+  user (required)
+    The user that wishes to manage this service.
+  god_compatibility
+    Also set up Sudo entries to allow the user to use "god".
+  passwd
+    Whether sudo should prompt for a password to manage this service.
+    Defaults to 'true' (that is, the user will be prompted for a password).
