@@ -2,9 +2,7 @@ define allah::check($ensure  = present,
                     $source  = undef,
                     $content = undef) {
 	File {
-		mode    => 0555,
-		require => Noop["daemontools/installed"],
-		before  => Noop["daemontools/configured:${name}"],
+		mode    => 0555;
 	}
 
 	case $ensure {
@@ -15,12 +13,14 @@ define allah::check($ensure  = present,
 
 			if $source {
 				file { "/var/lib/service/${name}/check":
-					source => $source;
+					source  => $source,
+					require => File["/var/lib/service/${name}"];
 				}
 			}
 			if $content {
 				file { "/var/lib/service/${name}/check":
-					content => $content;
+					content => $content,
+					require => File["/var/lib/service/${name}"];
 				}
 			}
 		}
