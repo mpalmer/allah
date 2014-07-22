@@ -1,2 +1,3 @@
-mod 'sudo',
-    :git => "git://github.com/anchor/puppet-module-sudo"
+mod 'mpalmer/sudo',
+    :git => "git://github.com/mpalmer/puppet-module-sudo",
+    :ref => "v1"
