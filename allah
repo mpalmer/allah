@@ -71,6 +71,7 @@ module Allah
 				when 'unmonitor' then do_action(@argv[1], :unmonitor)
 				when 'smite'     then do_action(@argv[1], :smite)
 				when 'log'       then do_log(@argv[1])
+				when 'logdump'   then do_logdump(@argv[1])
 				when 'status'    then do_status(@argv[1])
 				when 'check'     then GOD ? 0 : do_status(@argv[1], true)
 				when 'signal'    then do_signal(@argv[1], @argv[2])
@@ -97,6 +98,7 @@ module Allah
 EOF
 			unless GOD
 				puts <<EOF
+				logdump <task name>                print all log messages for task
 				check [task or group name]         show status and run task checks
 				smite <task or group name>         stop task or group, and make *sure* it's down
 EOF
@@ -154,6 +156,29 @@ EOF
 
 			# This function, if successfully executed, never returns
 			raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
+
+		def do_logdump(svc)
+			if svc.nil?
+				puts "You must specify a Task name"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
+
+			logfiles = []
+
+			if svclist[:services][svc]
+				logdir = File.dirname(svclist[:services][svc].logfile)
+				logfiles = (Dir["#{logdir}/@*.s"] + [svclist[:services][svc].logfile]).sort
+			else
+				puts "Task '#{svc}' not found"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			exec "cat #{logfiles.join ' '} | tai64nlocal"
+
+			return RC_OK
 		end
 
 		def do_status(svc_or_group_or_nil, check = false)
