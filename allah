@@ -164,6 +164,29 @@ module Allah
 
 			# This function, if successfully executed, never returns
 			raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
+
+		def do_logdump(svc)
+			if svc.nil?
+				puts "You must specify a Task name"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
+
+			logfiles = []
+
+			if svclist[:services][svc]
+				logdir = File.dirname(svclist[:services][svc].logfile)
+				logfiles = (Dir["#{logdir}/@*.s"] + [svclist[:services][svc].logfile]).sort
+			else
+				puts "Task '#{svc}' not found"
+				return GOD ? RC_ERR : RC_USAGE
+			end
+
+			exec "cat #{logfiles.join ' '} | tai64nlocal"
+
+			return RC_OK
 		end
 
 		def do_status(svc_or_group_or_nil, check = false)
