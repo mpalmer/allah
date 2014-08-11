@@ -156,6 +156,7 @@ EOF
 
 			# This function, if successfully executed, never returns
 			raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
+		end
 
 		def do_logdump(svc)
 			if svc.nil?
