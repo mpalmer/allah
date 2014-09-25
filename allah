@@ -82,30 +82,33 @@ module Allah
 		end
 
 		def do_help
-			puts <<EOF
-		  Usage:
-			 #{BASENAME} <command> [arguments]
+			puts <<-EOF.gsub(/^\t{4}/, '')
+				Usage:
+				 #{BASENAME} <command> [arguments]
 
-			 Commands:
-				start <task or group name>         start task or group
-				restart <task or group name>       restart task or group
-				stop <task or group name>          stop task or group
-				monitor <task or group name>       monitor task or group
-				unmonitor <task or group name>     unmonitor task or group
-				remove <task or group name>        remove task or group from #{BASENAME}
-				log <task or group name>           show realtime log for given task
-				status [task or group name]        show status
-EOF
+				 Commands:
+					start <task or group name>         start task or group
+					restart <task or group name>       restart task or group
+					stop <task or group name>          stop task or group
+					monitor <task or group name>       monitor task or group
+					unmonitor <task or group name>     unmonitor task or group
+					remove <task or group name>        remove task or group from #{BASENAME}
+					log <task or group name>           show realtime log for given task
+					status [task or group name]        show status
+			EOF
+
 			unless GOD
-				puts <<EOF
-				logdump <task name>                print all log messages for task
-				check [task or group name]         show status and run task checks
-				smite <task or group name>         stop task or group, and make *sure* it's down
-EOF
+				puts <<-EOF.gsub(/^\t{4}/, '')
+					logdump <task name>                print all log messages for task
+					check [task or group name]         show status and run task checks
+					smite <task or group name>         stop task or group, and make *sure* it's down
+				EOF
 			end
-			puts <<EOF
+
+			puts <<-EOF.gsub(/^\t{3}/, '')
 				signal <task or group name> <sig>  signal all matching tasks
-EOF
+			EOF
+
 			return RC_OK
 		end
 
