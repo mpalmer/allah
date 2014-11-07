@@ -17,6 +17,7 @@ define allah::sudo($service,
 		"allah/sudo/${name}/${service}/${user}/start":     command => "${allah_bin} start ${service}";
 		"allah/sudo/${name}/${service}/${user}/restart":   command => "${allah_bin} restart ${service}";
 		"allah/sudo/${name}/${service}/${user}/stop":      command => "${allah_bin} stop ${service}";
+		"allah/sudo/${name}/${service}/${user}/smite":     command => "${allah_bin} smite ${service}";
 		"allah/sudo/${name}/${service}/${user}/monitor":   command => "${allah_bin} monitor ${service}";
 		"allah/sudo/${name}/${service}/${user}/unmonitor": command => "${allah_bin} unmonitor ${service}";
 		"allah/sudo/${name}/${service}/${user}/log":       command => "${allah_bin} log ${service}";
