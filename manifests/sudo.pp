@@ -21,6 +21,7 @@ define allah::sudo($service,
 		"allah/sudo/${name}/${service}/${user}/monitor":   command => "${allah_bin} monitor ${service}";
 		"allah/sudo/${name}/${service}/${user}/unmonitor": command => "${allah_bin} unmonitor ${service}";
 		"allah/sudo/${name}/${service}/${user}/log":       command => "${allah_bin} log ${service}";
+		"allah/sudo/${name}/${service}/${user}/logdump":   command => "${allah_bin} logdump ${service}";
 		"allah/sudo/${name}/${service}/${user}/status":    command => "${allah_bin} status ${service}";
 		"allah/sudo/${name}/${service}/${user}/signal":    command => "${allah_bin} signal ${service} *";
 	}
