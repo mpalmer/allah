@@ -2,6 +2,9 @@
 #
 # A god-compatible CLI to daemontools services.
 
+require 'etc'
+require 'fileutils'
+
 BASENAME = File.basename($0)
 if BASENAME == "god"
 	GOD = true
@@ -57,7 +60,7 @@ module Allah
 		def initialize(argv)
 			@argv = argv
 		end
-		
+
 		def run
 			case @argv[0]
 				when nil         then do_help
@@ -74,6 +77,8 @@ module Allah
 				when 'status'    then do_status(@argv[1])
 				when 'check'     then GOD ? 0 : do_status(@argv[1], true)
 				when 'signal'    then do_signal(@argv[1], @argv[2])
+				when 'create'    then do_create(@argv[1], @argv[2], (@argv[3..-1] || []).join(' '))
+				when 'nuke'      then do_nuke(@argv[1])
 				else
 					puts "Command #{@argv[0]} is not valid. Run '#{$0} --help' for usage"
 					GOD ? RC_ERR : RC_USAGE
@@ -100,6 +105,8 @@ module Allah
 				puts <<-EOF.gsub(/^\t{4}/, '')
 					check [task or group name]         show status and run task checks
 					smite <task or group name>         stop task or group, and make *sure* it's down
+					create <task> <user> <command...>  create a new allah service
+					nuke <task>                        remove an allah service, including logs
 				EOF
 			end
 
@@ -131,7 +138,7 @@ module Allah
 
 			svclist = Allah.scan_services(svdir)
 			return RC_TEMP if svclist.nil?
-			
+
 			logfiles = []
 
 			if svclist[:services][svc]
@@ -231,6 +238,100 @@ module Allah
 			else
 				sgn.signal(sig) ? RC_OK : RC_ERR
 			end
+		end
+
+		def do_create(svc, user, cmd)
+			if svc.nil?
+				puts "ERROR: No service name specified"
+				return RC_ERR
+			end
+
+			if user.nil?
+				puts "ERROR: No user specified"
+				return RC_ERR
+			end
+
+			if cmd.nil? or cmd.empty?
+				puts "ERROR: No command specified"
+				return RC_ERR
+			end
+
+			unless svc =~ /^[a-z0-9_.-]+$/
+				puts "ERROR: Invalid service name: #{svc}"
+				return RC_ERR
+			end
+
+			gid = nil
+			Etc.passwd { |p| gid = p.gid if p.name == user }
+
+			if gid.nil?
+				puts "ERROR: User #{user} does not exist"
+			end
+
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
+
+			sgn = svclist[:groups][svc] ||
+			      svclist[:services][svc] ||
+			      nil
+
+			unless sgn.nil?
+				puts "ERROR: Service #{svc} already exists"
+				return RC_ERR
+			end
+
+			FileUtils.mkdir_p("/var/lib/service/#{svc}/log/logs", :mode => 0750)
+			FileUtils.chown(nil, gid, ["/var/lib/service/#{svc}",
+			                           "/var/lib/service/#{svc}/log"])
+
+			File.write("/var/lib/service/#{svc}/log/run", <<-EOF, :perm => 0740)
+#!/bin/sh
+
+exec 2>&1
+
+exec setuidgid #{user} multilog t ./logs
+EOF
+
+			File.write("/var/lib/service/#{svc}/run", <<-EOF, :perm => 0740)
+#!/bin/sh
+
+exec 2>&1
+
+exec setuidgid #{user} #{cmd}
+EOF
+
+			File.symlink("/var/lib/service/#{svc}", "#{svdir}/#{svc}")
+
+			puts "Service #{svc} has been created"
+			RC_OK
+		end
+
+		def do_nuke(svc)
+			if svc.nil?
+				puts "ERROR: No service name specified"
+				return RC_ERR
+			end
+
+			svclist = Allah.scan_services(svdir)
+			return RC_TEMP if svclist.nil?
+
+			if svclist[:services][svc].nil?
+				puts "ERROR: Service #{svc} does not exist"
+				return RC_ERR
+			end
+
+			real_dir = File.readlink("#{svdir}/#{svc}")
+			File.delete("#{svdir}/#{svc}")
+
+			if File.directory?("#{real_dir}/log")
+				Kernel.system("svc", "-kx",  "#{real_dir}/log")
+			end
+			Kernel.system("svc", "-kx", "#{real_dir}")
+
+			FileUtils.rm_rf("#{real_dir}", :secure => true)
+
+			puts "Service #{svc} has been nuked"
+			RC_OK
 		end
 
 		def svdir
@@ -353,20 +454,20 @@ module Allah
 
 			st
 		end
-		
+
 		def uptime
 			parse_svstat
 			@uptime
 		end
-		
+
 		def pid
 			parse_svstat
 			@pid
 		end
-		
+
 		def parse_svstat
 			return if @uptime and @pid
-			
+
 			if `svstat #{@svcdir}` =~ /: up \(pid (\d+)\) (\d+) seconds/
 				@pid = $1
 				@uptime = $2
