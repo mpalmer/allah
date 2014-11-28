@@ -283,6 +283,7 @@ module Allah
 			FileUtils.mkdir_p("/var/lib/service/#{svc}/log/logs", :mode => 0750)
 			FileUtils.chown(nil, gid, ["/var/lib/service/#{svc}",
 			                           "/var/lib/service/#{svc}/log"])
+			FileUtils.chown(user, gid, ["/var/lib/service/#{svc}/log/logs"])
 
 			File.write("/var/lib/service/#{svc}/log/run", <<-EOF, :perm => 0740)
 #!/bin/sh
