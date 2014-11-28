@@ -74,6 +74,7 @@ module Allah
 				when 'unmonitor' then do_action(@argv[1], :unmonitor)
 				when 'smite'     then do_action(@argv[1], :smite)
 				when 'log'       then do_log(@argv[1])
+				when 'logdump'   then do_logdump(@argv[1])
 				when 'status'    then do_status(@argv[1])
 				when 'check'     then GOD ? 0 : do_status(@argv[1], true)
 				when 'signal'    then do_signal(@argv[1], @argv[2])
@@ -98,7 +99,16 @@ module Allah
 					unmonitor <task or group name>     unmonitor task or group
 					remove <task or group name>        remove task or group from #{BASENAME}
 					log <task or group name>           show realtime log for given task
-					status [task or group name]        show status
+			EOF
+
+			unless GOD
+				puts <<-EOF.gsub(/^\t{4}/, '')
+					logdump <task or group name>       dump *all* logs for given task
+				EOF
+			end
+
+			puts <<-EOF.gsub(/^\t{3}/, '')
+				status [task or group name]        show status
 			EOF
 
 			unless GOD
