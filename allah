@@ -376,8 +376,18 @@ EOF
 				return RC_ERR
 			end
 
-			real_dir = File.readlink("#{svdir}/#{svc}")
-			File.delete("#{svdir}/#{svc}")
+			real_dir = nil
+			if File.link?("#{svdir}/#{svc}")
+				real_dir = File.readlink("#{svdir}/#{svc}")
+				File.delete("#{svdir}/#{svc}")
+			elsif File.directory?("#{svdir}/#{svc}")
+				File.rename("#{svdir}/#{svc}", "#{svdir}/.#{svc}")
+				real_dir = "#{svdir}/.#{svc}"
+			elsif File.exists?("#{svdir}/#{svc}")
+				puts "ERROR: #{svdir}/#{svc} doesn't appear to be a service dir."
+			else
+				puts "ERROR: #{svdir}/#{svc} doesn't exist.  That shouldn't happen..."
+			end
 
 			if File.directory?("#{real_dir}/log")
 				Kernel.system("svc", "-kx",  "#{real_dir}/log")
