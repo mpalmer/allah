@@ -73,7 +73,7 @@ module Allah
 				when 'monitor'   then do_action(@argv[1], :monitor)
 				when 'unmonitor' then do_action(@argv[1], :unmonitor)
 				when 'smite'     then do_action(@argv[1], :smite)
-				when 'log'       then do_log(@argv[1])
+				when 'log'       then do_log(@argv[1..-1])
 				when 'logdump'   then do_logdump(@argv[1])
 				when 'status'    then do_status(@argv[1])
 				when 'check'     then GOD ? 0 : do_status(@argv[1], true)
@@ -98,8 +98,13 @@ module Allah
 					monitor <task or group name>       monitor task or group
 					unmonitor <task or group name>     unmonitor task or group
 					remove <task or group name>        remove task or group from #{BASENAME}
-					log <task or group name>           show realtime log for given task
 			EOF
+
+			if GOD
+				puts "	log <task or group name>           show realtime log for given task"
+			else
+				puts "	log [-n <N>] <task or group name>  show realtime log for given task"
+			end
 
 			unless GOD
 				puts <<-EOF.gsub(/^\t{4}/, '')
@@ -140,7 +145,21 @@ module Allah
 			ctl.send(action) ? RC_OK : RC_ERR
 		end
 
-		def do_log(svc)
+		def do_log(args)
+			svc = nil
+			backlog = nil
+
+			if GOD
+				svc = args[0]
+			else
+				if args[0] == "-n"
+					backlog = args[1]
+					svc     = args[2]
+				else
+					svc = args[0]
+				end
+			end
+
 			if svc.nil?
 				puts "You must specify a Task name"
 				return GOD ? RC_ERR : RC_USAGE
@@ -170,7 +189,9 @@ module Allah
 				return GOD ? RC_ERR : RC_USAGE
 			end
 
-			exec "tail --follow=name #{logfiles.join(' ')} | tai64nlocal"
+			backlog_opt = backlog ? "-n #{backlog}" : ""
+
+			exec "tail #{backlog_opt} --follow=name #{logfiles.join(' ')} | tai64nlocal"
 
 			# This function, if successfully executed, never returns
 			raise RuntimeError.new("Can't happen: dropped out the bottom of do_log")
