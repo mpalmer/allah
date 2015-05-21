@@ -377,7 +377,7 @@ EOF
 			end
 
 			real_dir = nil
-			if File.link?("#{svdir}/#{svc}")
+			if File.symlink?("#{svdir}/#{svc}")
 				real_dir = File.readlink("#{svdir}/#{svc}")
 				File.delete("#{svdir}/#{svc}")
 			elsif File.directory?("#{svdir}/#{svc}")
