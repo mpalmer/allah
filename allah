@@ -432,10 +432,12 @@ EOF
 		end
 
 		def start
+			File.unlink("#{@svcdir}/down") if File.exists?("#{@svcdir}/down")
 			signal("UP")
 		end
 
 		def stop
+			File.write("#{@svcdir}/down", '')
 			if GOD
 				# god is very violent by default; allah is far more gentle, but
 				# is available for smiting separately if required
@@ -467,6 +469,7 @@ EOF
 		end
 
 		def smite
+			File.write("#{@svcdir}/down", '')
 			6.times { signal("DOWN"); return 0 if [:down, :unmonitored].include? status; sleep 1 }
 			signal("KILL")
 		end
