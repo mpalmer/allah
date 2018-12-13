@@ -2,7 +2,7 @@ define allah::check($ensure  = present,
                     $source  = undef,
                     $content = undef) {
 	File {
-		mode    => 0555;
+		mode    => "0555";
 	}
 
 	case $ensure {
